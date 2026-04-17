@@ -14,6 +14,7 @@ import com.example.unitask_app.domain.usecase.RegisterUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -21,7 +22,7 @@ import javax.inject.Inject
 class AuthViewModel @Inject constructor(
     private val loginUseCase: LoginUseCase,
     private val registerUseCase: RegisterUseCase,
-    private val tokenManager: TokenManager, // INYECTAMOS TOKEN MANAGER
+    private val tokenManager: TokenManager,
     private val connectivityManager: ConnectivityManager,
     private val vibrator: Vibrator
 ) : ViewModel() {
@@ -50,9 +51,7 @@ class AuthViewModel @Inject constructor(
                 val response = loginUseCase(LoginRequest(email, password))
                 if (response.isSuccessful) {
                     response.body()?.let { authResponse ->
-                        // --- PASO CLAVE: GUARDAR EL TOKEN Y ID REAL ---
                         tokenManager.saveToken(authResponse.token, authResponse.user.id)
-                        
                         _loginState.value = AuthState.Success(authResponse)
                     } ?: run {
                         _loginState.value = AuthState.Error("Respuesta vacía")
@@ -62,6 +61,20 @@ class AuthViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 _loginState.value = AuthState.Error("Error: ${e.localizedMessage}")
+            }
+        }
+    }
+
+    // Función para manejar el éxito del login biométrico
+    fun biometricLoginSuccess() {
+        viewModelScope.launch {
+            val lastUserId = tokenManager.getUserId().firstOrNull()
+            if (lastUserId != null && lastUserId != -1) {
+                _loginState.value = AuthState.Success(
+                    AuthResponse("biometric_token", User(lastUserId, "Usuario Biométrico", "", "", ""))
+                )
+            } else {
+                 _loginState.value = AuthState.Error("Primero debes iniciar sesión manualmente una vez.")
             }
         }
     }

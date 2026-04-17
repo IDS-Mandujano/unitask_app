@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.unitask_app.data.local.TokenManager
 import com.example.unitask_app.data.model.Subject
 import com.example.unitask_app.data.model.Task
+import com.example.unitask_app.data.model.User
 import com.example.unitask_app.data.repository.TaskRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,7 +16,11 @@ import javax.inject.Inject
 
 sealed class DashboardState {
     object Loading : DashboardState()
-    data class Success(val tasks: List<Task>, val subjects: List<Subject>) : DashboardState()
+    data class Success(
+        val tasks: List<Task>, 
+        val subjects: List<Subject>,
+        val user: User? = null
+    ) : DashboardState()
     data class Error(val message: String) : DashboardState()
 }
 
@@ -39,11 +44,13 @@ class DashboardViewModel @Inject constructor(
                 
                 val tasksResponse = repository.getTasks()
                 val subjectsResponse = repository.getSubjects(id)
+                val profileResponse = repository.getProfile(id)
 
                 if (tasksResponse.isSuccessful && subjectsResponse.isSuccessful) {
                     _uiState.value = DashboardState.Success(
                         tasks = tasksResponse.body() ?: emptyList(),
-                        subjects = subjectsResponse.body() ?: emptyList()
+                        subjects = subjectsResponse.body() ?: emptyList(),
+                        user = profileResponse.body()
                     )
                 } else {
                     _uiState.value = DashboardState.Error("Error al cargar datos del servidor")

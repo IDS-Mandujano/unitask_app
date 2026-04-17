@@ -46,7 +46,8 @@ fun DashboardScreen(
             LargeTopAppBar(
                 title = { 
                     Column {
-                        Text("Hola, Eduardo", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        val userName = (uiState as? DashboardState.Success)?.user?.username ?: "Usuario"
+                        Text("Hola, $userName", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Text("Resumen de tus actividades", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
                     }
                 },

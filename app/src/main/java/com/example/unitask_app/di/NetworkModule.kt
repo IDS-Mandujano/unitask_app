@@ -16,8 +16,8 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
 
-    // VERIFICA QUE ESTA IP SEA LA QUE TE DIO 'hostname -I'
-    private const val BASE_URL = "http://192.168.100.86:8080/" 
+    // URL de la API en EC2
+    private const val BASE_URL = "http://44.216.237.112:8080/" 
 
     @Provides
     @Singleton

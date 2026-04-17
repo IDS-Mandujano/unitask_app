@@ -1,18 +1,24 @@
 package com.example.unitask_app.ui.screen
 
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.unitask_app.ui.component.UniTaskButton
@@ -28,6 +34,13 @@ fun LoginScreen(
     val loginState by viewModel.loginState.collectAsState()
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    val context = LocalContext.current
+
+    // Detectar si el hardware soporta biométricos
+    val biometricManager = remember { BiometricManager.from(context) }
+    val canAuthenticate = remember {
+        biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
+    }
 
     Column(
         modifier = Modifier
@@ -78,6 +91,22 @@ fun LoginScreen(
                     onClick = { viewModel.login(email, password) },
                     enabled = loginState !is AuthState.Loading
                 )
+
+                // BOTÓN DE HUELLA: Solo aparece si el sensor es detectado y funcional
+                if (canAuthenticate) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedButton(
+                        onClick = {
+                            showBiometricPrompt(context as FragmentActivity, viewModel)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Icon(Icons.Default.Fingerprint, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Ingresar con Huella")
+                    }
+                }
             }
         }
 
@@ -87,7 +116,6 @@ fun LoginScreen(
             Text("¿No tienes cuenta? Regístrate aquí", color = MaterialTheme.colorScheme.primary)
         }
 
-        // CORRECCIÓN: Manejo de nulidad seguro
         if (loginState is AuthState.Success) {
             val response = (loginState as AuthState.Success).data
             response?.user?.let { user ->
@@ -107,4 +135,28 @@ fun LoginScreen(
             )
         }
     }
+}
+
+private fun showBiometricPrompt(
+    activity: FragmentActivity,
+    viewModel: AuthViewModel
+) {
+    val executor = ContextCompat.getMainExecutor(activity)
+    val biometricPrompt = BiometricPrompt(activity, executor,
+        object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                super.onAuthenticationSucceeded(result)
+                // Aquí podrías implementar login automático si ya tienes credenciales guardadas
+                // Por ahora, simulamos el éxito del login
+                viewModel.biometricLoginSuccess()
+            }
+        })
+
+    val promptInfo = BiometricPrompt.PromptInfo.Builder()
+        .setTitle("Inicio de Sesión Biométrico")
+        .setSubtitle("Usa tu huella para acceder")
+        .setNegativeButtonText("Cancelar")
+        .build()
+
+    biometricPrompt.authenticate(promptInfo)
 }
