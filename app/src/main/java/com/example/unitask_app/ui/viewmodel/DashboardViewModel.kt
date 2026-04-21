@@ -65,14 +65,22 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    fun completeTask(taskId: Int) {
+    fun toggleTaskCompletion(task: Task) {
         viewModelScope.launch {
             try {
-                val response = repository.completeTask(taskId)
+                val response = if (!task.isCompleted) {
+                    repository.completeTask(task.id)
+                } else {
+                    repository.pendingTask(task.id)
+                }
                 if (response.isSuccessful) {
                     loadData(currentUserId)
+                } else {
+                    _uiState.value = DashboardState.Error("No se pudo actualizar el estado de la tarea")
                 }
-            } catch (e: Exception) { }
+            } catch (e: Exception) {
+                _uiState.value = DashboardState.Error(e.localizedMessage ?: "No se pudo actualizar la tarea")
+            }
         }
     }
 

@@ -56,16 +56,18 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    private fun validateLetters(value: String, fieldName: String): String? {
+    private fun validateTextField(value: String, fieldName: String): String? {
         if (value.isBlank()) return "$fieldName es requerido"
-        val regex = Regex("^[\\p{L}0-9 ._-]+$")
-        if (!regex.matches(value)) return "$fieldName solo puede contener letras y números"
+        val regex = Regex("^[\\p{L}0-9 .,_'-]+$")
+        if (!regex.matches(value)) return "$fieldName contiene caracteres inválidos"
+        if (!value.any { it.isLetter() }) return "$fieldName no puede ser solo números"
         return null
     }
 
     private fun validateEmail(email: String): String? {
         if (email.isBlank()) return "Correo es requerido"
-        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) return "Ingresa un correo válido"
+        val regex = Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
+        if (!regex.matches(email.trim())) return "Ingresa un correo válido"
         return null
     }
 
@@ -127,6 +129,7 @@ class AuthViewModel @Inject constructor(
                 if (response.isSuccessful) {
                     response.body()?.let { authResponse ->
                         tokenManager.saveToken(authResponse.token, authResponse.user.id)
+                        tokenManager.setBiometricEnabled(true)
                         val fcmToken = tokenManager.getFcmToken().firstOrNull()
                         if (!fcmToken.isNullOrBlank()) {
                             syncDeviceTokenIfPossible(fcmToken)
@@ -153,6 +156,7 @@ class AuthViewModel @Inject constructor(
             val token = tokenManager.getToken().firstOrNull()
             val lastUserId = tokenManager.getUserId().firstOrNull()
             if (!token.isNullOrBlank() && lastUserId != null && lastUserId != -1) {
+                tokenManager.setBiometricEnabled(true)
                 _loginState.value = AuthState.Success(
                     AuthResponse(token, User(lastUserId, "Usuario", "", "", ""))
                 )
@@ -170,7 +174,7 @@ class AuthViewModel @Inject constructor(
             return
         }
 
-        validateLetters(username, "Nombre de usuario")?.let {
+        validateTextField(username, "Nombre de usuario")?.let {
             _registerState.value = AuthState.Error(it)
             vibrateError()
             return
@@ -182,13 +186,13 @@ class AuthViewModel @Inject constructor(
             return
         }
 
-        validateLetters(career, "Carrera")?.let {
+        validateTextField(career, "Carrera")?.let {
             _registerState.value = AuthState.Error(it)
             vibrateError()
             return
         }
 
-        validateLetters(university, "Universidad")?.let {
+        validateTextField(university, "Universidad")?.let {
             _registerState.value = AuthState.Error(it)
             vibrateError()
             return

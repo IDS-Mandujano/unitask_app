@@ -47,6 +47,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -54,6 +55,7 @@ import androidx.navigation.NavController
 import com.example.unitask_app.data.model.Subject
 import com.example.unitask_app.ui.component.UniTaskButton
 import com.example.unitask_app.ui.component.UniTaskTextField
+import com.example.unitask_app.ui.util.formatDueDateForDisplay
 import com.example.unitask_app.ui.viewmodel.SubjectUiState
 import com.example.unitask_app.ui.viewmodel.SubjectViewModel
 
@@ -63,6 +65,7 @@ fun SubjectManagementScreen(
     navController: NavController,
     viewModel: SubjectViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     var showCreateDialog by remember { mutableStateOf(false) }
 
@@ -186,6 +189,7 @@ fun SubjectDetailScreen(
     subjectId: Int,
     viewModel: SubjectViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     var editMode by remember { mutableStateOf(false) }
 
@@ -318,7 +322,10 @@ fun SubjectDetailScreen(
                                 ) {
                                     Column(modifier = Modifier.padding(14.dp)) {
                                         Text(task.title, fontWeight = FontWeight.Bold)
-                                        Text(task.dueDate.take(16).replace("T", " "), style = MaterialTheme.typography.bodySmall)
+                                        Text(
+                                            formatDueDateForDisplay(task.dueDate, context),
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
                                     }
                                 }
                             }

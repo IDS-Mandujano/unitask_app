@@ -63,10 +63,11 @@ fun LoginScreen(
         refreshAndRegisterFcmToken(viewModel)
     }
 
-    val hasSavedBiometricSession = biometricEnabled && !savedToken.isNullOrEmpty() && savedUserId?.let { it != -1 } == true
+    val hasSavedAuthSession = !savedToken.isNullOrEmpty() && savedUserId?.let { it != -1 } == true
+    val hasSavedBiometricSession = biometricEnabled && hasSavedAuthSession
 
     LaunchedEffect(canAuthenticate, hasSavedBiometricSession, loginState) {
-        if (canAuthenticate && hasSavedBiometricSession && loginState is AuthState.Idle && !biometricPromptRequested) {
+        if (canAuthenticate && hasSavedAuthSession && loginState is AuthState.Idle && !biometricPromptRequested) {
             biometricPromptRequested = true
             showBiometricPrompt(context as FragmentActivity, viewModel)
         }
@@ -123,7 +124,7 @@ fun LoginScreen(
                 )
 
                 // BOTÓN DE HUELLA: Solo aparece si ya existe una sesión biométrica guardada.
-                if (canAuthenticate && hasSavedBiometricSession) {
+                if (canAuthenticate && hasSavedAuthSession) {
                     Spacer(modifier = Modifier.height(16.dp))
                     OutlinedButton(
                         onClick = {

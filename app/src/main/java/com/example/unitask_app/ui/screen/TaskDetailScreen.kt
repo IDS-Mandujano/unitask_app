@@ -29,6 +29,8 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.unitask_app.ui.component.UniTaskButton
+import com.example.unitask_app.ui.component.UniTaskTextField
+import com.example.unitask_app.ui.util.formatDueDateForDisplay
 import com.example.unitask_app.ui.viewmodel.TaskDetailUiState
 import com.example.unitask_app.ui.viewmodel.TaskDetailViewModel
 import kotlinx.coroutines.launch
@@ -154,6 +156,10 @@ fun TaskDetailScreen(
                     return@Scaffold
                 }
 
+                var isEditing by remember(task.id) { mutableStateOf(false) }
+                var editedTitle by remember(task.id, task.title) { mutableStateOf(task.title) }
+                var editedDescription by remember(task.id, task.description) { mutableStateOf(task.description) }
+
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -169,7 +175,16 @@ fun TaskDetailScreen(
                         elevation = CardDefaults.cardElevation(2.dp)
                     ) {
                         Column(modifier = Modifier.padding(24.dp)) {
-                            Text(task.title, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                            if (isEditing) {
+                                UniTaskTextField(
+                                    value = editedTitle,
+                                    onValueChange = { editedTitle = it },
+                                    label = "Título"
+                                )
+                            } else {
+                                Text(task.title, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                            }
+
                             if (!task.subjectName.isNullOrBlank()) {
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(task.subjectName, fontWeight = FontWeight.SemiBold)
@@ -181,11 +196,74 @@ fun TaskDetailScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.Schedule, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text(task.dueDate.take(16).replace("T", " "), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                                Text(
+                                    formatDueDateForDisplay(task.dueDate, context),
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                )
                             }
                             Spacer(modifier = Modifier.height(16.dp))
                             Text("Descripción", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                            Text(task.description, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f))
+                            if (isEditing) {
+                                UniTaskTextField(
+                                    value = editedDescription,
+                                    onValueChange = { editedDescription = it },
+                                    label = "Descripción"
+                                )
+                            } else {
+                                Text(task.description, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f))
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                                if (isEditing) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            isEditing = false
+                                            editedTitle = task.title
+                                            editedDescription = task.description
+                                        },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("Cancelar")
+                                    }
+                                    Button(
+                                        onClick = {
+                                            val newTitle = editedTitle.trim()
+                                            val newDescription = editedDescription.trim()
+                                            if (newTitle.isBlank() || newDescription.isBlank()) {
+                                                Toast.makeText(context, "Título y descripción son requeridos", Toast.LENGTH_SHORT).show()
+                                                return@Button
+                                            }
+
+                                            viewModel.updateTask(
+                                                task.copy(
+                                                    title = newTitle,
+                                                    description = newDescription
+                                                )
+                                            ) { ok ->
+                                                if (ok) {
+                                                    isEditing = false
+                                                    Toast.makeText(context, "Tarea actualizada", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    Toast.makeText(context, "No se pudo actualizar", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("Guardar")
+                                    }
+                                } else {
+                                    OutlinedButton(
+                                        onClick = { isEditing = true },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(Icons.Default.Edit, contentDescription = null)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Editar tarea")
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -242,25 +320,25 @@ fun TaskDetailScreen(
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    if (!task.isCompleted) {
-                        UniTaskButton(
-                            text = "Marcar como Completada",
-                            onClick = {
-                                viewModel.completeTask(taskId)
-                                Toast.makeText(context, "¡Tarea completada!", Toast.LENGTH_SHORT).show()
+                    UniTaskButton(
+                        text = if (task.isCompleted) "Marcar como pendiente" else "Marcar como completada",
+                        onClick = {
+                            val markAsCompleted = !task.isCompleted
+                            viewModel.setTaskCompletion(task, markAsCompleted) { ok ->
+                                if (ok) {
+                                    val message = if (task.isCompleted) {
+                                        "La tarea volvió a pendiente"
+                                    } else {
+                                        "¡Tarea completada!"
+                                    }
+                                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "No se pudo actualizar el estado", Toast.LENGTH_SHORT).show()
+                                }
                             }
-                        )
-                    } else {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(32.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Esta tarea ya fue completada", fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50))
-                        }
-                    }
+                        },
+                        containerColor = if (task.isCompleted) Color(0xFFFF9800) else MaterialTheme.colorScheme.primary
+                    )
                 }
             }
         }

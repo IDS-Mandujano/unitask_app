@@ -27,6 +27,7 @@ class TaskRepository @Inject constructor(
     suspend fun createTask(task: Task) = apiService.createTask(task)
     suspend fun updateTask(task: Task) = apiService.updateTask(task)
     suspend fun completeTask(id: Int) = apiService.completeTask(id)
+    suspend fun pendingTask(id: Int) = apiService.pendingTask(id)
     suspend fun deleteTask(id: Int) = apiService.deleteTask(id)
 
     suspend fun getAttachments(taskId: Int? = null, subjectId: Int? = null): Response<List<Attachment>> = apiService.getAttachments(taskId, subjectId)

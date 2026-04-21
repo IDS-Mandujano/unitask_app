@@ -98,6 +98,43 @@ class TaskDetailViewModel @Inject constructor(
         }
     }
 
+    fun updateTask(task: Task, onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                val response = taskRepository.updateTask(task)
+                if (response.isSuccessful) {
+                    loadTask(task.id)
+                    onResult(true)
+                } else {
+                    onResult(false)
+                }
+            } catch (_: Exception) {
+                onResult(false)
+            }
+        }
+    }
+
+    fun setTaskCompletion(task: Task, completed: Boolean, onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                val response = if (completed) {
+                    taskRepository.completeTask(task.id)
+                } else {
+                    taskRepository.pendingTask(task.id)
+                }
+
+                if (response.isSuccessful) {
+                    loadTask(task.id)
+                    onResult(true)
+                } else {
+                    onResult(false)
+                }
+            } catch (_: Exception) {
+                onResult(false)
+            }
+        }
+    }
+
     fun deleteTask(taskId: Int) {
         viewModelScope.launch {
             val response = taskRepository.deleteTask(taskId)

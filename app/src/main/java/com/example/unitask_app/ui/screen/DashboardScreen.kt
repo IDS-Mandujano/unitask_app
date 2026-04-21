@@ -75,6 +75,7 @@ import com.example.unitask_app.data.model.Task
 import com.example.unitask_app.ui.component.SectionHeader
 import com.example.unitask_app.ui.component.UniTaskButton
 import com.example.unitask_app.ui.component.UniTaskTextField
+import com.example.unitask_app.ui.util.formatDueDateForDisplay
 import com.example.unitask_app.ui.viewmodel.DashboardState
 import com.example.unitask_app.ui.viewmodel.DashboardViewModel
 import java.text.SimpleDateFormat
@@ -176,7 +177,7 @@ fun DashboardScreen(
                             TaskItem(
                                 task = task,
                                 onClick = { navController.navigate("task_detail/${task.id}") },
-                                onComplete = { viewModel.completeTask(task.id) }
+                                onComplete = { viewModel.toggleTaskCompletion(task) }
                             )
                             Spacer(modifier = Modifier.height(12.dp))
                         }
@@ -214,7 +215,8 @@ fun AddEntityDialog(
     onAddTask: (String, String, Int, String) -> Unit
 ) {
     val context = LocalContext.current
-    var selectedTab by remember { mutableIntStateOf(0) }
+    val hasSubjects = subjects.isNotEmpty()
+    var selectedTab by remember(subjects.size) { mutableIntStateOf(0) }
     var name by remember { mutableStateOf("") }
     var title by remember { mutableStateOf("") }
     var desc by remember { mutableStateOf("") }
@@ -295,7 +297,14 @@ fun AddEntityDialog(
                     Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }) {
                         Text("Materia", modifier = Modifier.padding(8.dp))
                     }
-                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }) {
+                    Tab(selected = selectedTab == 1, onClick = {
+                        if (!hasSubjects) {
+                            Toast.makeText(context, "Primero crea una materia", Toast.LENGTH_SHORT).show()
+                            selectedTab = 0
+                        } else {
+                            selectedTab = 1
+                        }
+                    }) {
                         Text("Tarea", modifier = Modifier.padding(8.dp))
                     }
                 }
@@ -309,33 +318,42 @@ fun AddEntityDialog(
                     Spacer(modifier = Modifier.height(8.dp))
                     UniTaskTextField(value = teacherEmail, onValueChange = { teacherEmail = it }, label = "Correo del docente (opcional)")
                 } else {
-                    UniTaskTextField(value = title, onValueChange = { title = it }, label = "Título de la tarea")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    UniTaskTextField(value = desc, onValueChange = { desc = it }, label = "Descripción")
-                    Spacer(modifier = Modifier.height(8.dp))
+                    if (!hasSubjects) {
+                        Text(
+                            text = "Necesitas al menos una materia para crear tareas.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                    } else {
+                        UniTaskTextField(value = title, onValueChange = { title = it }, label = "Título de la tarea")
+                        Spacer(modifier = Modifier.height(8.dp))
+                        UniTaskTextField(value = desc, onValueChange = { desc = it }, label = "Descripción")
+                        Spacer(modifier = Modifier.height(8.dp))
 
-                    OutlinedButton(onClick = { showDatePicker() }, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Default.DateRange, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Fecha: ${formatDateLabel()}")
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedButton(onClick = { showTimePicker() }, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Default.Schedule, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Hora: ${formatTimeLabel()}")
-                    }
+                        OutlinedButton(onClick = { showDatePicker() }, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Default.DateRange, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Fecha: ${formatDateLabel()}")
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(onClick = { showTimePicker() }, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Default.Schedule, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Hora: ${formatTimeLabel()}")
+                        }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
-                    Text("Selecciona Materia:", style = MaterialTheme.typography.bodySmall)
-                    subjects.forEach { subject ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.clickable { selectedSubjectId = subject.id }
-                        ) {
-                            RadioButton(selected = selectedSubjectId == subject.id, onClick = { selectedSubjectId = subject.id })
-                            Text(subject.name)
+                        Text("Selecciona Materia:", style = MaterialTheme.typography.bodySmall)
+                        subjects.forEach { subject ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.clickable { selectedSubjectId = subject.id }
+                            ) {
+                                RadioButton(selected = selectedSubjectId == subject.id, onClick = { selectedSubjectId = subject.id })
+                                Text(subject.name)
+                            }
                         }
                     }
                 }
@@ -346,6 +364,10 @@ fun AddEntityDialog(
                 if (selectedTab == 0) {
                     onAddSubject(name, teacherName, teacherEmail)
                 } else {
+                    if (!hasSubjects) {
+                        Toast.makeText(context, "Primero crea una materia", Toast.LENGTH_SHORT).show()
+                        return@UniTaskButton
+                    }
                     val dueCalendar = selectedDueCalendar()
                     val nowCalendar = Calendar.getInstance()
                     if (dueCalendar.timeInMillis < nowCalendar.timeInMillis) {
@@ -356,7 +378,7 @@ fun AddEntityDialog(
                     onAddTask(title, desc, selectedSubjectId, dueDateIso)
                 }
                 onDismiss()
-            })
+            }, enabled = selectedTab == 0 || hasSubjects)
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancelar") }
@@ -369,7 +391,10 @@ fun DashboardSubjectCard(subject: Subject, onClick: () -> Unit) {
     Card(
         modifier = Modifier.width(160.dp).wrapContentHeight().clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(2.dp)
+        elevation = CardDefaults.cardElevation(4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+        )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(subject.name, fontWeight = FontWeight.Bold, maxLines = 2)
@@ -384,17 +409,25 @@ fun DashboardSubjectCard(subject: Subject, onClick: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskItem(task: Task, onClick: () -> Unit, onComplete: () -> Unit) {
+    val context = LocalContext.current
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(2.dp)
+        elevation = CardDefaults.cardElevation(3.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (task.isCompleted) {
+                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f)
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
+        )
     ) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onComplete) {
                 Icon(
                     imageVector = if (task.isCompleted) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-                    contentDescription = "Completar",
+                    contentDescription = if (task.isCompleted) "Marcar pendiente" else "Marcar completada",
                     tint = if (task.isCompleted) Color.Green else Color.Gray
                 )
             }
@@ -405,7 +438,11 @@ fun TaskItem(task: Task, onClick: () -> Unit, onComplete: () -> Unit) {
                     fontWeight = FontWeight.Bold,
                     textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null
                 )
-                Text(task.dueDate.take(10), fontSize = 12.sp, color = Color.Gray)
+                Text(
+                    formatDueDateForDisplay(task.dueDate, context),
+                    fontSize = 12.sp,
+                    color = Color.Gray
+                )
             }
             Icon(Icons.Default.ChevronRight, null, tint = Color.LightGray)
         }

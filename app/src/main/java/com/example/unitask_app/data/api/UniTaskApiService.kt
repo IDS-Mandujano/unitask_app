@@ -52,6 +52,9 @@ interface UniTaskApiService {
     @PATCH("tasks/complete")
     suspend fun completeTask(@Query("id") id: Int): Response<Unit>
 
+    @PATCH("tasks/pending")
+    suspend fun pendingTask(@Query("id") id: Int): Response<Unit>
+
     @DELETE("tasks")
     suspend fun deleteTask(@Query("id") id: Int): Response<Unit>
 
