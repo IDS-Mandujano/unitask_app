@@ -3,13 +3,19 @@ package com.example.unitask_app.data.repository
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
+import com.example.unitask_app.BuildConfig
 import com.example.unitask_app.data.model.Attachment
 import com.example.unitask_app.data.model.AttachmentRequest
 import com.example.unitask_app.data.api.UniTaskApiService
-import com.google.firebase.FirebaseApp
-import com.google.firebase.storage.FirebaseStorage
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.asRequestBody
+import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
@@ -21,14 +27,8 @@ class AttachmentRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val apiService: UniTaskApiService
 ) {
-    private val storage by lazy {
-        val bucket = FirebaseApp.getInstance().options.storageBucket
-        if (!bucket.isNullOrBlank()) {
-            FirebaseStorage.getInstance("gs://$bucket")
-        } else {
-            FirebaseStorage.getInstance()
-        }
-    }
+    private val httpClient = OkHttpClient()
+    private val cloudinaryUrl = "https://api.cloudinary.com/v1_1/${BuildConfig.CLOUDINARY_CLOUD_NAME}/upload"
 
     suspend fun uploadBitmap(
         bitmap: Bitmap,
@@ -67,9 +67,9 @@ class AttachmentRepository @Inject constructor(
         val mimeType = mimeTypeOverride ?: resolver.getType(uri) ?: "application/octet-stream"
         val fileName = fileNameOverride ?: queryDisplayName(uri) ?: "${UUID.randomUUID()}"
         val storagePath = buildStoragePath(attachmentType, fileName, taskId, subjectId)
-        val ref = storage.reference.child(storagePath)
-        ref.putFile(uri).await()
-        val downloadUrl = ref.downloadUrl.await().toString()
+        
+        val downloadUrl = uploadToCloudinary(uri, storagePath)
+        
         return registerAttachment(
             fileName = fileName,
             mimeType = mimeType,
@@ -79,6 +79,50 @@ class AttachmentRepository @Inject constructor(
             subjectId = subjectId,
             taskId = taskId
         )
+    }
+
+    private suspend fun uploadToCloudinary(uri: Uri, publicId: String): String {
+        return withContext(Dispatchers.IO) {
+            val file = uriToFile(uri)
+            try {
+                val requestBody = MultipartBody.Builder()
+                    .setType(MultipartBody.FORM)
+                    .addFormDataPart("file", file.name, file.asRequestBody("application/octet-stream".toMediaType()))
+                    .addFormDataPart("upload_preset", BuildConfig.CLOUDINARY_UPLOAD_PRESET)
+                    .addFormDataPart("public_id", publicId)
+                    .addFormDataPart("folder", "unitask")
+                    .build()
+
+                val request = Request.Builder()
+                    .url(cloudinaryUrl)
+                    .post(requestBody)
+                    .build()
+
+                val response = httpClient.newCall(request).execute()
+                if (!response.isSuccessful) {
+                    throw Exception("Cloudinary upload failed: ${response.code}")
+                }
+
+                val jsonResponse = JSONObject(response.body?.string() ?: "{}")
+                val secureUrl = jsonResponse.optString("secure_url", "")
+                if (secureUrl.isEmpty()) {
+                    throw Exception("No URL en respuesta de Cloudinary")
+                }
+                secureUrl
+            } finally {
+                file.delete()
+            }
+        }
+    }
+
+    private fun uriToFile(uri: Uri): File {
+        val tempFile = File.createTempFile("unitask_${UUID.randomUUID()}", ".tmp", context.cacheDir)
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            FileOutputStream(tempFile).use { output ->
+                input.copyTo(output)
+            }
+        }
+        return tempFile
     }
 
     suspend fun getAttachments(taskId: Int? = null, subjectId: Int? = null): List<Attachment> {
@@ -106,10 +150,6 @@ class AttachmentRepository @Inject constructor(
             )
         )
         if (!response.isSuccessful || response.body() == null) {
-            try {
-                storage.reference.child(storagePath).delete().await()
-            } catch (_: Exception) {
-            }
             throw IllegalStateException("No se pudo registrar el adjunto en el backend")
         }
         return response.body()!!

@@ -11,12 +11,18 @@ android {
     namespace = "com.example.unitask_app"
     compileSdk = 34
 
+    val cloudinaryCloudName = (project.findProperty("CLOUDINARY_CLOUD_NAME") as String?) ?: ""
+    val cloudinaryUploadPreset = (project.findProperty("CLOUDINARY_UPLOAD_PRESET") as String?) ?: "unitask_app"
+
     defaultConfig {
         applicationId = "com.example.unitask_app"
         minSdk = 24
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+
+        buildConfigField("String", "CLOUDINARY_CLOUD_NAME", "\"$cloudinaryCloudName\"")
+        buildConfigField("String", "CLOUDINARY_UPLOAD_PRESET", "\"$cloudinaryUploadPreset\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -39,6 +45,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
